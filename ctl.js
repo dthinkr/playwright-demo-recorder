@@ -141,8 +141,18 @@ async function snap() {
     + `${step.hotspot ? ' [hotspot]' : ''}  ${size} MB  ${step.url}`);
 }
 
-function finish() {
-  const state = readState();
+async function finish() {
+  let state = readState();
+  if (state.auto) {
+    // Tell the watcher to stop, then let it flush what is still buffered
+    // before we read the session file it is writing to.
+    fs.writeFileSync(STOP, '');
+    try { state.steps.push(...drainAuto(state.session)); } catch (e) { /* session gone */ }
+    await sleep(1600);
+    const latest = readState();
+    // The watcher may have appended while we drained; keep whichever has more.
+    if (latest.steps.length > state.steps.length) state = latest;
+  }
   if (!state.steps.length) {
     console.error('no steps recorded');
     process.exit(1);
@@ -161,8 +171,168 @@ function finish() {
   console.log(`raw steps      -> ${stepsFile}`);
 }
 
+/**
+ * Auto mode: arm the page once, then let whoever is driving just drive.
+ *
+ * A click listener in the page captures the snapshot and the clicked element's
+ * rect at the moment of the click, and buffers it. No `snap` call per step, no
+ * cooperation from the agent — it browses as usual and the steps accumulate.
+ * Captions default to the element's own label, which is usually the right
+ * sentence already ("Click 'Issues'").
+ *
+ * Buffered in the page rather than pulled per click because pulling is a
+ * multi-second round trip; doing that inline would change the timing of the
+ * very session we are trying to observe.
+ */
+function armAuto(session) {
+  const lib = fs.readFileSync(LIB, 'utf8');
+  const arm = `() => {
+    if (!window.rrwebSnapshot) { ${lib} ; window.rrwebSnapshot = rrwebSnapshot; }
+    if (window.__demoAuto) return 'already armed';
+    window.__demoBuf = window.__demoBuf || [];
+    const label = (el) => {
+      const t = (el.getAttribute('aria-label') || el.innerText || el.value || '').trim();
+      return t ? t.replace(/\\s+/g, ' ').slice(0, 60) : el.tagName.toLowerCase();
+    };
+    const grab = (target) => {
+      try {
+        const el = target && target.closest
+          ? (target.closest('a,button,input,textarea,select,[role=button],[role=link]') || target)
+          : null;
+        let hotspot = null;
+        if (el && el.getBoundingClientRect) {
+          const r = el.getBoundingClientRect();
+          if (r.width && r.height) {
+            hotspot = { x: r.left, y: r.top, width: r.width, height: r.height };
+          }
+        }
+        const snapshot = window.rrwebSnapshot.snapshot(document, {
+          inlineStylesheet: true, inlineImages: true, recordCanvas: true,
+        });
+        window.__demoBuf.push({
+          snapshot, hotspot,
+          caption: el ? 'Click "' + label(el) + '"'
+            : (document.title || location.pathname).slice(0, 70),
+          viewport: { width: innerWidth, height: innerHeight },
+          scroll: { x: scrollX, y: scrollY },
+          url: location.href,
+        });
+      } catch (e) { /* one lost step must not break the session */ }
+    };
+    // Capture phase: fires before the app's own handler mutates the DOM, so the
+    // snapshot is the state the user was looking at when they clicked.
+    document.addEventListener('click', (e) => grab(e.target), true);
+    window.__demoGrab = grab;
+    window.__demoAuto = true;
+    return 'armed';
+  }`;
+  return resultOf(pageEval(session, arm));
+}
+
+/** Drain the in-page buffer, gzipped and chunked (see snap() for why). */
+function drainAuto(session) {
+  const n = parseInt(resultOf(pageEval(session,
+    '() => String((window.__demoBuf || []).length)')), 10);
+  if (!n) return [];
+  const steps = [];
+  for (let i = 0; i < n; i++) {
+    const count = parseInt(resultOf(pageEval(session, `() => {
+      const bytes = new TextEncoder().encode(JSON.stringify(window.__demoBuf[${i}]));
+      return new Response(new Blob([bytes]).stream()
+        .pipeThrough(new CompressionStream('gzip'))).arrayBuffer().then((buf) => {
+          let bin = ''; const v = new Uint8Array(buf);
+          for (let k = 0; k < v.length; k += 8192) {
+            bin += String.fromCharCode.apply(null, v.subarray(k, k + 8192));
+          }
+          window.__demoChunks = btoa(bin).match(/[\\s\\S]{1,${CHUNK}}/g) || [];
+          return String(window.__demoChunks.length);
+        });
+    }`)), 10);
+    let b64 = '';
+    for (let c = 0; c < count; c++) {
+      b64 += resultOf(pageEval(session, `() => window.__demoChunks[${c}]`));
+    }
+    steps.push(JSON.parse(zlib.gunzipSync(Buffer.from(b64, 'base64')).toString('utf8')));
+    process.stdout.write(`  pulled step ${i + 1}/${n}\r`);
+  }
+  pageEval(session, '() => { window.__demoBuf = []; delete window.__demoChunks; return "cleared"; }');
+  console.log('');
+  return steps;
+}
+
+const STOP = path.join(__dirname, '.stop');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Watch loop for auto mode.
+ *
+ * A navigation destroys the page context, taking the injected listener and the
+ * buffered steps with it — so arming once is not enough. This re-arms whenever
+ * the page comes up bare, and drains the buffer to disk as it fills, which also
+ * keeps multi-MB snapshots from piling up in page memory.
+ */
+async function watch() {
+  fs.existsSync(STOP) && fs.unlinkSync(STOP);
+  let armedSeen = 0;
+  let lastUrl = null;
+  while (!fs.existsSync(STOP)) {
+    try {
+      const state = readState();
+      const armed = /true/.test(
+        resultOf(pageEval(state.session, '() => String(!!window.__demoAuto)')),
+      );
+      if (!armed) {
+        armAuto(state.session);
+        if (armedSeen++) console.log('re-armed after navigation');
+      }
+      // A click that navigates loses its buffered snapshot: the page is torn
+      // down before any poll can drain it. So also capture on arrival — the
+      // landed page becomes its own step. In-page clicks (dialogs, tabs,
+      // filters) still come through the listener with their hotspot intact.
+      const here = resultOf(pageEval(state.session, '() => location.href'));
+      if (here && here !== lastUrl) {
+        if (lastUrl !== null) {
+          pageEval(state.session, '() => { window.__demoGrab && window.__demoGrab(null); return "grabbed"; }');
+        }
+        lastUrl = here;
+      }
+
+      const pending = parseInt(
+        resultOf(pageEval(state.session, '() => String((window.__demoBuf || []).length)')), 10,
+      );
+      if (pending > 0) {
+        const fresh = drainAuto(state.session);
+        const next = readState();
+        next.steps.push(...fresh);
+        writeState(next);
+        console.log(`captured ${fresh.length} step(s) — ${next.steps.length} total`);
+      }
+    } catch (e) {
+      // The session can disappear mid-run; keep watching rather than dying.
+    }
+    await sleep(1200);
+  }
+  fs.existsSync(STOP) && fs.unlinkSync(STOP);
+  console.log('watcher stopped');
+}
+
 (async () => {
-  if (cmd === 'start') {
+  if (cmd === 'auto') {
+    // One command in, a recording out: arm, browse, finish.
+    const session = opt('session', 'view');
+    writeState({
+      session,
+      out: opt('out', 'out/session'),
+      title: opt('title', 'Demo'),
+      accent: opt('accent', undefined),
+      auto: true,
+      steps: [],
+    });
+    console.log(armAuto(session) + ' on session "' + session + '".');
+    console.log('browse and click as usual, then: node ctl.js finish');
+    console.log('watching (re-arms across navigations)...');
+    await watch();
+  } else if (cmd === 'start') {
     writeState({
       session: opt('session', 'view'),
       out: opt('out', 'out/session'),
@@ -174,7 +344,7 @@ function finish() {
   } else if (cmd === 'snap') {
     await snap();
   } else if (cmd === 'finish') {
-    finish();
+    await finish();
   } else if (cmd === 'status') {
     const s = readState();
     console.log(`session=${s.session} steps=${s.steps.length} out=${s.out}`);

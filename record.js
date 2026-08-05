@@ -77,9 +77,16 @@ async function main() {
     process.exit(1);
   }
 
-  // Keep the raw capture so the player can be re-themed or re-bundled without
-  // driving the app again (recording needs the stack up; rebuilding does not).
-  const stepsPath = path.resolve(base + '-steps.json');
+  // A run that died mid-flow must not clobber a good capture sitting at the
+  // same path: partial output goes to a `.partial` name, so the previous
+  // recording survives a transient failure (wrong branch, slow backend, a
+  // selector that moved).
+  const suffix = failure ? '-partial' : '';
+  if (failure) {
+    console.log(`\nflow ended early — writing to ${path.basename(base)}${suffix}.* `
+      + 'so the previous capture is left intact');
+  }
+  const stepsPath = path.resolve(base + suffix + '-steps.json');
   fs.writeFileSync(stepsPath, JSON.stringify({
     title: flow.title || path.basename(flowPath, '.js'),
     steps: rec.steps,
@@ -88,7 +95,7 @@ async function main() {
   const built = buildPlayer({
     steps: rec.steps,
     title: flow.title || path.basename(flowPath, '.js'),
-    outFile: path.resolve(base + '.html'),
+    outFile: path.resolve(base + suffix + '.html'),
   });
 
   const mb = (n) => (n / 1024 / 1024).toFixed(1) + ' MB';

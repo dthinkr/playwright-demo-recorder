@@ -9,6 +9,7 @@
   "keywords": [],
   "type": "commonjs",
   "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
     "playwright": "^1.62.1",
     "rrweb-snapshot": "^2.1.1"
   }

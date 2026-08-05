@@ -56,9 +56,27 @@ Same model Supademo uses. `rec.note()` is a "look at this" beat.
 Taps a live `playwright-cli` session instead of owning the browser. Real clicks,
 existing login state, no separate run.
 
+**Auto** — one command, then just browse:
+
+```bash
+node ctl.js auto --session view --out out/mydemo --title "..."   # arm + watch
+# ... the agent browses and clicks as it normally would ...
+node ctl.js finish
+```
+
+A click listener captures each in-page interaction with its hotspot, and a
+watcher captures each page you land on. The watcher also re-arms after every
+navigation, since a page load takes the injected listener with it.
+
+*Caveat:* for a click that navigates, the pre-click frame is lost — the page is
+torn down before any poll can drain it, so you get the page you landed on
+rather than the click that got you there. In-page clicks (dialogs, tabs,
+filters) keep their hotspot.
+
+**Manual** — when you want to choose the steps and write the captions:
+
 ```bash
 node ctl.js start --session view --out out/mydemo --title "..."
-# ... browse and click normally ...
 node ctl.js snap --say "Click Issues" --at "a[href$='/issues']"
 node ctl.js snap --say "The list loads here"
 node ctl.js finish
@@ -75,6 +93,19 @@ to localhost.
 node video.js out/convo.html              # video from any built demo
 node rebuild.js out/convo-steps.json --accent '#0f766e'   # restyle, no re-record
 ```
+
+## Built on
+
+Deliberately thin. The parts that are solved problems are not re-solved here:
+
+| | |
+|---|---|
+| DOM serialize / rebuild | [`rrweb-snapshot`](https://github.com/rrweb-io/rrweb) |
+| Callout anchoring, flip, collision | [`@floating-ui/dom`](https://github.com/floating-ui/floating-ui) |
+| Browser driving, video capture | [Playwright](https://playwright.dev) |
+
+What is actually ours: the step model (discrete snapshots + hotspots), the
+attach transport, and the pipeline.
 
 ## How it works
 
