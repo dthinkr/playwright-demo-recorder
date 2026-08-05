@@ -262,7 +262,32 @@ async function loadSteps() {
     throw new Error('DecompressionStream unavailable');
   }
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-  STEPS = JSON.parse(await new Response(stream).text());
+  const payload = JSON.parse(await new Response(stream).text());
+  STEPS = payload.steps;
+  // Bulk values repeated across steps (images, fonts, stylesheets) were stored
+  // once at build time; put them back before anything tries to render.
+  if (payload.assets && payload.assets.length) restoreAssets(STEPS, payload.assets);
+}
+
+function restoreAssets(steps, assets) {
+  const TOKEN = /^__ASSET_(\d+)__$/;
+  const put = (v) => {
+    const m = typeof v === 'string' && TOKEN.exec(v);
+    return m ? assets[+m[1]] : undefined;
+  };
+  const walk = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (node.attributes) {
+      for (const k of Object.keys(node.attributes)) {
+        const out = put(node.attributes[k]);
+        if (out !== undefined) node.attributes[k] = out;
+      }
+    }
+    const t = put(node.textContent);
+    if (t !== undefined) node.textContent = t;
+    if (Array.isArray(node.childNodes)) node.childNodes.forEach(walk);
+  };
+  steps.forEach((s) => walk(s.snapshot));
 }
 
 function layout(step) {

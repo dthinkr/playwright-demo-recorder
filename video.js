@@ -57,7 +57,16 @@ const BASE_HOLD = Number(opt('hold', 2200));
   const steps = await page.evaluate(() => STEPS.map((s) => ({ caption: s.caption || '' })));
   console.log(`filming ${steps.length} steps at ${w}x${h}`);
 
-  await page.waitForTimeout(900); // let the first step settle before we start
+  // Hold the cover as a title card, then dismiss it. It is an overlay with a
+  // backdrop blur: leaving it up means filming the entire walkthrough through
+  // frosted glass, which is exactly what happened before this line existed.
+  await page.waitForTimeout(1800);
+  await page.evaluate(() => {
+    const btn = document.getElementById('startBtn');
+    if (btn) btn.click();
+    document.getElementById('cover')?.classList.add('gone');
+  });
+  await page.waitForTimeout(700);
 
   for (let i = 0; i < steps.length; i++) {
     if (i > 0) await page.evaluate((n) => go(n), i);
