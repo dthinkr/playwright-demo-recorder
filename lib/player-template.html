@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+  :root {
+    --accent: __ACCENT__;
+    --accent-soft: __ACCENT_SOFT__;
+    --page: #f4f4f6;
+    --ink: #16161d;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--page); color: var(--ink);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* ── Top bar ──────────────────────────────────────────────────────── */
+  header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 22px; background: #fff; border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  header .title { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+  header .sep { width: 1px; height: 18px; background: var(--line); }
+  header .sub { color: var(--muted); font-size: 13px; }
+  header .spacer { flex: 1; }
+  header .count {
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
+  }
+
+  /* ── Stage: the captured page, framed ─────────────────────────────── */
+  #stage { flex: 1; position: relative; display: grid; place-items: center; padding: 26px; min-height: 0; }
+  /* #fit carries the SCALED dimensions so normal centring works; #scaler keeps
+     the captured page at 1:1 and is shrunk from its top-left corner. Scaling a
+     full-size box directly would overflow the grid track, and an overflowing
+     centred item gets snapped back to the start — which clipped the right edge. */
+  #fit {
+    position: relative; overflow: hidden;
+    border-radius: var(--radius); background: #fff;
+    box-shadow: 0 1px 2px rgba(16,24,40,.06), 0 12px 40px rgba(16,24,40,.12);
+    border: 1px solid var(--line);
+  }
+  #scaler { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  /* Two iframes coexist during a step change: the new one fades in over the
+     old, so steps dissolve instead of hard-cutting. */
+  #mount { position: absolute; inset: 0; }
+  #mount iframe {
+    position: absolute; top: 0; left: 0; border: 0; display: block; background: #fff;
+    transition: opacity .32s ease;
+  }
+  #overlay { position: absolute; inset: 0; pointer-events: none; }
+
+  /* Cursor lives outside the per-step overlay so it survives re-renders and
+     can glide from the previous hotspot to the new one. */
+  #cursor {
+    position: absolute; left: 0; top: 0; width: 26px; height: 26px;
+    margin: -4px 0 0 -3px; z-index: 5; pointer-events: none; opacity: 0;
+    transition: transform .72s cubic-bezier(.33,.72,.29,1), opacity .3s ease;
+    will-change: transform;
+  }
+  #cursor svg { display: block; filter: drop-shadow(0 2px 4px rgba(16,24,40,.35)); }
+  #cursorRipple {
+    position: absolute; left: 0; top: 0; width: 26px; height: 26px;
+    margin: -13px 0 0 -13px; border-radius: 50%;
+    border: 2px solid var(--accent); opacity: 0; z-index: 4; pointer-events: none;
+  }
+  #cursorRipple.go { animation: tap .55s ease-out; }
+  @keyframes tap {
+    0%   { transform: scale(.4); opacity: .9; }
+    100% { transform: scale(2.6); opacity: 0; }
+  }
+
+  /* ── Hotspot: solid dot + pulsing halo, sits on the target ────────── */
+  .hotspot {
+    position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px;
+    border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
+    cursor: pointer; pointer-events: auto;
+    animation: dotIn .3s ease-out .3s both;
+  }
+  @keyframes dotIn { from { transform: scale(0); } to { transform: scale(1); } }
+  .hotspot::after {
+    content: ''; position: absolute; inset: -6px; border-radius: 50%;
+    border: 2px solid var(--accent);
+    animation: halo 1.9s cubic-bezier(.2,.6,.35,1) infinite;
+  }
+  @keyframes halo {
+    0%   { transform: scale(.7); opacity: .85; }
+    70%  { transform: scale(2.1); opacity: 0; }
+    100% { transform: scale(2.1); opacity: 0; }
+  }
+
+  /* ── Callout: brand card, counter bottom-left, arrow bottom-right ── */
+  .callout {
+    position: absolute; width: 264px; pointer-events: auto;
+    background: var(--accent); color: #fff;
+    border-radius: 10px; padding: 14px 16px 12px;
+    box-shadow: 0 10px 34px rgba(16,24,40,.24);
+    /* Delayed so the card lands after the cursor has finished travelling. */
+    animation: cardIn .42s cubic-bezier(.2,.8,.3,1) .34s both;
+  }
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(8px) scale(.97); }
+    to   { opacity: 1; transform: none; }
+  }
+  .callout .text { font-size: 14px; font-weight: 650; line-height: 1.45; }
+  .callout .foot {
+    display: flex; align-items: center; margin-top: 12px;
+  }
+  .callout .of { font-size: 12px; font-weight: 600; color: rgba(255,255,255,.72);
+                 font-variant-numeric: tabular-nums; }
+  .callout .grow { flex: 1; }
+  .callout button {
+    width: 34px; height: 30px; border: 0; border-radius: 7px; cursor: pointer;
+    background: rgba(255,255,255,.22); color: #fff; font-size: 15px; line-height: 1;
+    display: grid; place-items: center;
+  }
+  .callout button:hover:not(:disabled) { background: rgba(255,255,255,.34); }
+  .callout button:disabled { opacity: .35; cursor: default; }
+  .callout .back { margin-right: 6px; }
+
+  /* ── Footer ───────────────────────────────────────────────────────── */
+  footer {
+    display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+    padding: 10px 22px; background: #fff; border-top: 1px solid var(--line);
+    font-size: 12px; color: var(--muted);
+  }
+  footer .dots { display: flex; gap: 6px; }
+  footer .dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--line);
+    cursor: pointer; transition: background .2s, transform .2s;
+  }
+  footer .dot.on { background: var(--accent); transform: scale(1.25); }
+  footer .url { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<header>
+  <span class="title">__TITLE__</span>
+  <span class="sep"></span>
+  <span class="sub" id="caption"></span>
+  <span class="spacer"></span>
+  <span class="count"><span id="cur">1</span> / <span id="total">1</span></span>
+</header>
+
+<div id="stage">
+  <div id="fit">
+    <div id="scaler">
+      <!-- The iframe is created per step by rrweb's rebuildIntoSandboxedIframe,
+           which owns the sandbox attribute (allow-same-origin, no allow-scripts). -->
+      <div id="mount"></div>
+      <div id="overlay"></div>
+      <div id="cursorRipple"></div>
+      <div id="cursor">
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+          <path d="M4 2.5 L4 20 L8.7 15.6 L11.6 22.4 L14.9 21 L12 14.4 L18.4 14.2 Z"
+                fill="#fff" stroke="rgba(16,24,40,.55)" stroke-width="1.2" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span class="dots" id="dots"></span>
+  <span class="url" id="url"></span>
+</footer>
+
+<script>__RRWEB_SNAPSHOT__</script>
+<script>
+// Steps travel gzipped+base64 so a multi-MB capture ships as a file people can
+// actually email. Inflated once here; from then on this is the same array the
+// uncompressed build produced, byte for byte.
+const STEPS_B64 = "__STEPS_B64__";
+let STEPS = [];
+let idx = 0;
+
+async function loadSteps() {
+  const bin = atob(STEPS_B64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  if (typeof DecompressionStream === 'undefined') {
+    document.body.innerHTML =
+      '<p style="padding:32px;font:15px system-ui">This demo needs a current '
+      + 'browser (Chrome 80+, Safari 16.4+, Firefox 113+).</p>';
+    throw new Error('DecompressionStream unavailable');
+  }
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  const text = await new Response(stream).text();
+  STEPS = JSON.parse(text);
+}
+
+const $ = (id) => document.getElementById(id);
+const mount = $('mount'), overlay = $('overlay'), scaler = $('scaler'),
+      fit = $('fit'), stage = $('stage'),
+      cursor = $('cursor'), ripple = $('cursorRipple');
+
+/** The page is rebuilt at its captured viewport size, then scaled to fit.
+ *  The overlay scales with it, so hotspot rects recorded in viewport pixels
+ *  stay aligned without any coordinate maths at draw time. */
+function layout(step) {
+  const { width, height } = step.viewport;
+  const scale = Math.min(stage.clientWidth / width, stage.clientHeight / height, 1);
+  scaler.style.width = width + 'px';
+  scaler.style.height = height + 'px';
+  scaler.style.transform = 'scale(' + scale + ')';
+  fit.style.width = Math.round(width * scale) + 'px';
+  fit.style.height = Math.round(height * scale) + 'px';
+}
+
+function render() {
+  const step = STEPS[idx];
+  layout(step);
+
+  // rrweb owns iframe creation so it can enforce the sandbox
+  // (allow-same-origin, no allow-scripts). Combined with its script->noscript
+  // rewrite at capture time, the clone is inert: CSS, hover states, fonts and
+  // layout survive, nothing executes. Same-origin is still permitted, so the
+  // parent can reach contentDocument to restore the captured scroll position.
+  const previous = Array.from(mount.children);
+  const { iframe } = rrwebSnapshot.rebuildIntoSandboxedIframe(step.snapshot, {
+    root: mount,
+    iframeAttributes: {
+      style: 'width:' + step.viewport.width + 'px;height:' + step.viewport.height
+           + 'px;border:0;display:block;background:#fff;opacity:0',
+    },
+    cache: rrwebSnapshot.createCache(),
+    mirror: rrwebSnapshot.createMirror(),
+  });
+  requestAnimationFrame(() => {
+    try {
+      const doc = iframe.contentDocument;
+      if (doc) {
+        // rrweb rewrites <script> to <noscript> at capture time, and this
+        // iframe deliberately has no allow-scripts — so the browser renders
+        // that noscript content, printing "SCRIPT_PLACEHOLDER" into the page.
+        // Hide it; the clone is meant to look like the product, not its guts.
+        const fix = doc.createElement('style');
+        fix.textContent = 'noscript{display:none!important}';
+        (doc.head || doc.documentElement).appendChild(fix);
+
+        doc.documentElement.scrollTop = step.scroll.y;
+        doc.documentElement.scrollLeft = step.scroll.x;
+        if (doc.body) doc.body.scrollTop = step.scroll.y;
+      }
+    } catch (e) { /* a missed scroll restore is not worth failing the step */ }
+    // Fade the new frame in over the old one, then drop the old. Cutting
+    // straight to the next snapshot reads as a slideshow; dissolving reads
+    // as the same page changing.
+    iframe.style.opacity = '1';
+    setTimeout(() => previous.forEach((el) => el.remove()), 340);
+  });
+
+  overlay.innerHTML = '';
+  const h = step.hotspot;
+  if (h) {
+    const dot = document.createElement('div');
+    dot.className = 'hotspot';
+    dot.style.left = (h.x + h.width / 2) + 'px';
+    dot.style.top = (h.y + h.height / 2) + 'px';
+    dot.onclick = () => go(idx + 1);
+    overlay.appendChild(dot);
+  }
+  overlay.appendChild(buildCallout(step, h));
+  moveCursor(h);
+
+  $('cur').textContent = idx + 1;
+  $('total').textContent = STEPS.length;
+  $('caption').textContent = step.caption || '';
+  $('url').textContent = step.url || '';
+  renderDots();
+}
+
+/**
+ * Glide the pointer to this step's hotspot and tap it on arrival.
+ *
+ * The element persists across renders, so setting a new transform animates
+ * from wherever it was — which is what makes the demo read as someone using
+ * the product rather than a deck advancing. Steps with no hotspot (a "look at
+ * the result" beat) hide the pointer instead of parking it somewhere random.
+ */
+let cursorTapTimer = null;
+function moveCursor(h) {
+  clearTimeout(cursorTapTimer);
+  if (!h) {
+    cursor.style.opacity = '0';
+    return;
+  }
+  const cx = h.x + h.width / 2;
+  const cy = h.y + h.height / 2;
+  const first = cursor.dataset.placed !== '1';
+  if (first) {
+    // Nothing to travel from on the opening step: appear just off the target.
+    cursor.style.transition = 'none';
+    cursor.style.transform = 'translate(' + (cx - 90) + 'px,' + (cy + 60) + 'px)';
+    cursor.offsetHeight; // flush, so the next transform actually animates
+    cursor.style.transition = '';
+    cursor.dataset.placed = '1';
+  }
+  cursor.style.opacity = '1';
+  cursor.style.transform = 'translate(' + cx + 'px,' + cy + 'px)';
+
+  ripple.style.transform = 'translate(' + cx + 'px,' + cy + 'px)';
+  cursorTapTimer = setTimeout(() => {
+    ripple.classList.remove('go');
+    ripple.offsetHeight;
+    ripple.classList.add('go');
+  }, 740);
+}
+
+function buildCallout(step, h) {
+  const box = document.createElement('div');
+  box.className = 'callout';
+
+  const text = document.createElement('div');
+  text.className = 'text';
+  text.textContent = step.caption || '';
+  box.appendChild(text);
+
+  const foot = document.createElement('div');
+  foot.className = 'foot';
+  const of = document.createElement('span');
+  of.className = 'of';
+  of.textContent = (idx + 1) + ' of ' + STEPS.length;
+  const grow = document.createElement('span');
+  grow.className = 'grow';
+  const back = document.createElement('button');
+  back.className = 'back';
+  back.innerHTML = '&#8592;';
+  back.disabled = idx === 0;
+  back.onclick = (e) => { e.stopPropagation(); go(idx - 1); };
+  const next = document.createElement('button');
+  next.innerHTML = '&#8594;';
+  next.disabled = idx === STEPS.length - 1;
+  next.onclick = (e) => { e.stopPropagation(); go(idx + 1); };
+  foot.append(of, grow, back, next);
+  box.appendChild(foot);
+
+  // Anchor below the target, roughly under the dot, flipping above when there
+  // is no room. Anchoring beside the dot looks fine on a link or a button but
+  // is wrong on a wide element (a search field), where "beside the midpoint"
+  // lands the card on top of unrelated UI. Steps with no hotspot are a
+  // "look at the result" beat and get a fixed corner position.
+  const W = 264, GAP = 14, EST_H = 104;
+  const vw = step.viewport.width, vh = step.viewport.height;
+  if (h) {
+    const dotX = h.x + h.width / 2;
+    const below = h.y + h.height + GAP;
+    const top = below + EST_H < vh - 12 ? below : Math.max(12, h.y - EST_H - GAP);
+    const left = Math.max(12, Math.min(dotX - 44, vw - W - 12));
+    box.style.left = left + 'px';
+    box.style.top = top + 'px';
+  } else {
+    box.style.left = '28px';
+    box.style.bottom = '28px';
+  }
+  return box;
+}
+
+function renderDots() {
+  const wrap = $('dots');
+  wrap.innerHTML = '';
+  STEPS.forEach((s, i) => {
+    const d = document.createElement('span');
+    d.className = 'dot' + (i === idx ? ' on' : '');
+    d.title = (i + 1) + '. ' + (s.caption || '');
+    d.onclick = () => go(i);
+    wrap.appendChild(d);
+  });
+}
+
+function go(i) {
+  if (i < 0 || i >= STEPS.length) return;
+  idx = i;
+  render();
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); go(idx + 1); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); go(idx - 1); }
+});
+window.addEventListener('resize', () => { if (STEPS.length) render(); });
+
+loadSteps().then(render);
+</script>
+</body>
+</html>

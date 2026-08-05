@@ -1,0 +1,15 @@
+node_modules/
+
+# Recorded output. These are full DOM clones of whatever was on screen —
+# real UI, real data, real internal URLs. Never commit them; ship the tool,
+# not the recordings.
+out/
+*.webm
+*-steps.json
+*-trace.zip
+
+# Live attach-mode session state
+.session.json
+
+.DS_Store
+.playwright-cli/
