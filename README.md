@@ -87,6 +87,33 @@ A local HTTP collector was the obvious design and does not survive contact with
 reality: strict sites set a `connect-src` CSP that blocks the page from posting
 to localhost.
 
+### 3. From a trace — nothing to instrument
+
+Playwright already records everything a walkthrough needs, so a trace can be
+turned into a demo after the fact — including traces from CI that finished
+weeks ago.
+
+```bash
+node from-trace.js out/run-trace.zip --title "..."
+```
+
+| Needed | Where it already is |
+|---|---|
+| DOM per step | `frame-snapshot.html` — one taken *before* every action, which is exactly the capture-then-act semantics the other modes hand-roll |
+| Hotspot | `input.point` — the real click coordinates |
+| Caption | the action's method + selector |
+| Viewport, URL | on the snapshot |
+
+No injection, no CSP workaround, no chunked transport, no re-arming after
+navigation: every one of those exists only because the other modes cannot see
+inside the browser.
+
+**Caveats.** The trace snapshot format is Playwright's own and undocumented —
+the decoder here follows their trace-viewer service worker, so it can break on
+a version bump. Steps come from *actions* only, so there are no "look at the
+result" beats, and captions fall back to a bare verb when the selector carries
+no human-readable text. Requires `tracing.start({ snapshots: true })`.
+
 ## Also
 
 ```bash

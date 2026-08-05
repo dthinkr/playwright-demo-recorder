@@ -310,15 +310,29 @@ function render() {
   layout(step);
 
   const previous = Array.from(mount.children);
-  const { iframe } = rrwebSnapshot.rebuildIntoSandboxedIframe(step.snapshot, {
-    root: mount,
-    iframeAttributes: {
-      style: 'width:' + step.viewport.width + 'px;height:' + step.viewport.height
-           + 'px;border:0;display:block;background:#fff;opacity:0',
-    },
-    cache: rrwebSnapshot.createCache(),
-    mirror: rrwebSnapshot.createMirror(),
-  });
+  const frameStyle = 'width:' + step.viewport.width + 'px;height:' + step.viewport.height
+    + 'px;border:0;display:block;background:#fff;opacity:0';
+
+  // Two capture backends land here. Steps carrying `html` came from a
+  // Playwright trace (already a rendered document); steps carrying `snapshot`
+  // came from rrweb and need rebuilding. Same player either way.
+  let iframe;
+  if (typeof step.html === 'string') {
+    iframe = document.createElement('iframe');
+    iframe.setAttribute('sandbox', 'allow-same-origin');
+    iframe.setAttribute('style', frameStyle);
+    mount.appendChild(iframe);
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(step.html);
+    iframe.contentDocument.close();
+  } else {
+    ({ iframe } = rrwebSnapshot.rebuildIntoSandboxedIframe(step.snapshot, {
+      root: mount,
+      iframeAttributes: { style: frameStyle },
+      cache: rrwebSnapshot.createCache(),
+      mirror: rrwebSnapshot.createMirror(),
+    }));
+  }
   requestAnimationFrame(() => {
     try {
       const doc = iframe.contentDocument;
