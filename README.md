@@ -160,7 +160,13 @@ Supademo works the same way. Cloning the running app instead is a different
 ```bash
 npm install
 npx playwright install chromium
+npm test                    # no browser needed
 ```
+
+Tests cover the parts that fail silently: node-reference addressing in the
+trace decoder (a wrong reference yields valid HTML of the wrong page), the
+gzip round trip, asset pooling, and self-containment — a demo that quietly
+depends on the network looks perfect on the machine that built it.
 
 Playback needs a current browser (Chrome 80+, Safari 16.4+, Firefox 113+) for
 `DecompressionStream`.

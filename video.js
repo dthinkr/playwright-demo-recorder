@@ -61,11 +61,19 @@ const BASE_HOLD = Number(opt('hold', 2200));
   // backdrop blur: leaving it up means filming the entire walkthrough through
   // frosted glass, which is exactly what happened before this line existed.
   await page.waitForTimeout(1800);
-  await page.evaluate(() => {
+  const coverGone = await page.evaluate(() => {
     const btn = document.getElementById('startBtn');
     if (btn) btn.click();
-    document.getElementById('cover')?.classList.add('gone');
+    const cover = document.getElementById('cover');
+    cover?.classList.add('gone');
+    return !cover || getComputedStyle(cover).display === 'none';
   });
+  // Filming through a cover that never lifted produces a whole video shot
+  // behind frosted glass — visible only if someone plays it back, which is
+  // exactly why it shipped once. Fail here instead.
+  if (!coverGone) {
+    throw new Error('the cover overlay is still visible — refusing to film the demo through it');
+  }
   await page.waitForTimeout(700);
 
   for (let i = 0; i < steps.length; i++) {

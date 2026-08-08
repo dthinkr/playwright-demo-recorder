@@ -13,3 +13,6 @@ out/
 
 .DS_Store
 .playwright-cli/
+
+# Flows against private/internal apps: kept locally, never published.
+flows/local/
