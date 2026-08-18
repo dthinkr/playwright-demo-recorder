@@ -12,18 +12,18 @@
  *   node ctl.js finish
  *
  * How it works: `playwright-cli eval` executes JS in the live page, so we
- * inject rrweb-snapshot there once and have the page POST each snapshot to a
- * short-lived local collector. Snapshots never travel back through stdout —
- * they are megabytes, and stdout is shared with the operator's console.
+ * inject rrweb-snapshot there once and pull each compressed snapshot through
+ * the CDP eval result in chunks.
  */
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const { execFileSync } = require('child_process');
 const { buildPlayer } = require('./lib/build');
+const { sanitizeStep } = require('./lib/sanitize');
 
-const LIB = path.join(__dirname, 'node_modules', 'rrweb-snapshot', 'dist', 'rrweb-snapshot.umd.min.cjs');
-const STATE = path.join(__dirname, '.session.json');
+const LIB = require.resolve('rrweb-snapshot');
+const STATE = path.join(process.cwd(), '.session.json');
 /** Base64 characters per eval round trip. Comfortably under what one CDP
  *  response carries, while keeping a multi-MB page to a handful of trips. */
 const CHUNK = 400000;
@@ -35,8 +35,15 @@ const opt = (name, fallback) => {
   return i >= 0 && args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : fallback;
 };
 
-const readState = () => JSON.parse(fs.readFileSync(STATE, 'utf8'));
-const writeState = (s) => fs.writeFileSync(STATE, JSON.stringify(s, null, 2));
+const readState = () => {
+  const state = JSON.parse(fs.readFileSync(STATE, 'utf8'));
+  state.steps = (state.steps || []).map(sanitizeStep);
+  return state;
+};
+const writeState = (s) => fs.writeFileSync(STATE, JSON.stringify({
+  ...s,
+  steps: (s.steps || []).map(sanitizeStep),
+}, null, 2));
 
 /** Run JS in the attached page. Output is discarded: playwright-cli echoes the
  *  source it ran, and ours can be 80KB of library. */
@@ -97,6 +104,7 @@ async function snap() {
     }));
     const snapshot = window.rrwebSnapshot.snapshot(document, {
       inlineStylesheet: true, inlineImages: true, recordCanvas: true,
+      maskInputFn: () => '••••••',
     });
     hidden.forEach(([el, prev]) => { el.style.display = prev; });
     const payload = JSON.stringify({
@@ -130,9 +138,9 @@ async function snap() {
     b64 += resultOf(pageEval(state.session, `() => window.__demoChunks[${i}]`));
   }
   pageEval(state.session, '() => { delete window.__demoChunks; return "cleared"; }');
-  const step = JSON.parse(
+  const step = sanitizeStep(JSON.parse(
     zlib.gunzipSync(Buffer.from(b64, 'base64')).toString('utf8'),
-  );
+  ));
 
   state.steps.push(step);
   writeState(state);
@@ -191,7 +199,8 @@ function armAuto(session) {
     if (window.__demoAuto) return 'already armed';
     window.__demoBuf = window.__demoBuf || [];
     const label = (el) => {
-      const t = (el.getAttribute('aria-label') || el.innerText || el.value || '').trim();
+      const t = (el.getAttribute('aria-label') || el.innerText
+        || el.getAttribute('placeholder') || el.getAttribute('name') || '').trim();
       return t ? t.replace(/\\s+/g, ' ').slice(0, 60) : el.tagName.toLowerCase();
     };
     const grab = (target) => {
@@ -208,6 +217,7 @@ function armAuto(session) {
         }
         const snapshot = window.rrwebSnapshot.snapshot(document, {
           inlineStylesheet: true, inlineImages: true, recordCanvas: true,
+          maskInputFn: () => '••••••',
         });
         window.__demoBuf.push({
           snapshot, hotspot,
@@ -252,7 +262,9 @@ function drainAuto(session) {
     for (let c = 0; c < count; c++) {
       b64 += resultOf(pageEval(session, `() => window.__demoChunks[${c}]`));
     }
-    steps.push(JSON.parse(zlib.gunzipSync(Buffer.from(b64, 'base64')).toString('utf8')));
+    steps.push(sanitizeStep(JSON.parse(
+      zlib.gunzipSync(Buffer.from(b64, 'base64')).toString('utf8'),
+    )));
     process.stdout.write(`  pulled step ${i + 1}/${n}\r`);
   }
   pageEval(session, '() => { window.__demoBuf = []; delete window.__demoChunks; return "cleared"; }');
@@ -260,7 +272,7 @@ function drainAuto(session) {
   return steps;
 }
 
-const STOP = path.join(__dirname, '.stop');
+const STOP = path.join(process.cwd(), '.stop');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -349,7 +361,7 @@ async function watch() {
     const s = readState();
     console.log(`session=${s.session} steps=${s.steps.length} out=${s.out}`);
   } else {
-    console.error('usage: ctl.js start|snap|finish|status');
+    console.error('usage: ctl.js start|auto|snap|finish|status');
     process.exit(1);
   }
 })().catch((e) => { console.error(e.message); process.exit(1); });

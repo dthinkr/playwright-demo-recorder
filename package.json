@@ -1,17 +1,74 @@
 {
-  "name": "demo-recorder",
-  "version": "1.0.0",
-  "description": "Turn a browser session into a self-contained interactive product demo",
+  "name": "playwright-demo-recorder",
+  "version": "0.1.0",
+  "description": "Agentic recorder for Playwright traces and browser runs that outputs portable interactive demos",
   "main": "index.js",
-  "scripts": {
-    "test": "node --test test/*.test.js"
+  "exports": {
+    ".": "./index.js"
   },
-  "keywords": [],
+  "bin": {
+    "playwright-demo": "./cli.js",
+    "playwright-demo-recorder": "./cli.js"
+  },
+  "files": [
+    "cli.js",
+    "index.js",
+    "sample.js",
+    "record.js",
+    "ctl.js",
+    "from-trace.js",
+    "rebuild.js",
+    "video.js",
+    "lib/",
+    "examples/basic-flow.cjs",
+    "THIRD_PARTY_NOTICES.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "docs/assets/hero.png",
+    "docs/assets/routes.svg"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "prepublishOnly": "npm test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dthinkr/playwright-demo-recorder.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dthinkr/playwright-demo-recorder/issues"
+  },
+  "homepage": "https://github.com/dthinkr/playwright-demo-recorder#readme",
+  "author": "dthinkr",
+  "keywords": [
+    "agentic",
+    "ai-agent",
+    "coding-agent",
+    "playwright",
+    "product-demo",
+    "interactive-demo",
+    "trace",
+    "screen-recording",
+    "session-replay"
+  ],
   "type": "commonjs",
   "dependencies": {
+    "@floating-ui/core": "^1.8.0",
     "@floating-ui/dom": "^1.8.0",
-    "playwright": "^1.62.1",
+    "playwright": ">=1.40 <2",
     "rrweb-snapshot": "^2.1.1"
+  },
+  "peerDependencies": {
+    "@playwright/cli": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/cli": {
+      "optional": true
+    }
   },
   "license": "Apache-2.0"
 }

@@ -13,7 +13,14 @@ const { stepsFromTrace } = require('./lib/trace');
 const { buildPlayer } = require('./lib/build');
 
 const args = process.argv.slice(2);
-const src = args.find((a) => !a.startsWith('--'));
+const valueOptions = new Set(['accent', 'out', 'title']);
+const positional = [];
+for (let i = 0; i < args.length; i++) {
+  const name = args[i].startsWith('--') ? args[i].slice(2) : null;
+  if (name && valueOptions.has(name)) { i++; continue; }
+  if (!name) positional.push(args[i]);
+}
+const src = positional[0];
 if (!src) {
   console.error('usage: node from-trace.js <trace.zip> [--out DIR/NAME] [--title TEXT]');
   process.exit(1);

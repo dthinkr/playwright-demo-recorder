@@ -4,12 +4,15 @@ node_modules/
 # real UI, real data, real internal URLs. Never commit them; ship the tool,
 # not the recordings.
 out/
+video/
 *.webm
 *-steps.json
 *-trace.zip
+*.tgz
 
 # Live attach-mode session state
 .session.json
+.stop
 
 .DS_Store
 .playwright-cli/

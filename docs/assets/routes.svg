@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420"
+  role="img" aria-labelledby="routes-title routes-desc">
+  <title id="routes-title">Three ways into Playwright Demo Recorder, one interactive artifact out</title>
+  <desc id="routes-desc">An existing Playwright trace, a repeatable flow file, or an experimental live playwright-cli session converge into normalized and packaged steps. The shared pipeline produces a single-file, portable interactive HTML demo and can optionally render a polished WebM video.</desc>
+
+  <defs>
+    <filter id="card-shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#111827" flood-opacity="0.08"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 8 4 0 8Z" fill="#4f46e5"/>
+    </marker>
+    <style>
+      .sans { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+      .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.7px; fill: #4f46e5; }
+      .headline { font-size: 29px; font-weight: 720; letter-spacing: -0.6px; fill: #16161d; }
+      .meta { font-size: 11px; font-weight: 650; letter-spacing: 0.7px; fill: #6b7280; }
+      .card-title { font-size: 15px; font-weight: 700; fill: #16161d; }
+      .card-sub { font-size: 12px; font-weight: 500; fill: #6b7280; }
+      .dark-label { font-size: 10px; font-weight: 700; letter-spacing: 1.3px; fill: #aeb7c8; }
+      .dark-title { font-size: 19px; font-weight: 700; letter-spacing: -0.25px; fill: #ffffff; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="420" fill="#f4f4f6"/>
+  <path d="M36 88H1164" stroke="#e0e2e7" stroke-width="1"/>
+
+  <g class="sans">
+    <g aria-hidden="true">
+      <rect x="36" y="22" width="22" height="22" rx="6" fill="#1e2939"/>
+      <rect x="41" y="27" width="12" height="9" rx="2" fill="none" stroke="#ffffff" stroke-opacity="0.92"/>
+      <circle cx="50" cy="35" r="2.7" fill="#4f46e5" stroke="#ffffff" stroke-width="1.4"/>
+    </g>
+    <text x="70" y="38" class="eyebrow">PLAYWRIGHT DEMO RECORDER</text>
+    <text x="36" y="72" class="headline">Three ways in. One artifact out.</text>
+    <text x="1164" y="38" text-anchor="end" class="meta">SINGLE FILE · CURRENT BROWSER</text>
+
+    <!-- Capture route: trace -->
+    <g filter="url(#card-shadow)">
+      <rect x="36" y="106" width="250" height="72" rx="12" fill="#ffffff" stroke="#dfe2e8"/>
+    </g>
+    <g aria-hidden="true">
+      <rect x="52" y="122" width="40" height="40" rx="9" fill="#eeecff"/>
+      <path d="M64 130.5h9l6 6v16H64Z" fill="none" stroke="#4f46e5" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M73 130.5v6h6M68 143h7M68 147h7" fill="none" stroke="#4f46e5" stroke-width="1.4" stroke-linecap="round"/>
+    </g>
+    <text x="108" y="136" class="card-title mono">trace.zip</text>
+    <text x="108" y="156" class="card-sub">Existing Playwright trace</text>
+
+    <!-- Capture route: flow -->
+    <g filter="url(#card-shadow)">
+      <rect x="36" y="190" width="250" height="72" rx="12" fill="#ffffff" stroke="#dfe2e8"/>
+    </g>
+    <g aria-hidden="true">
+      <rect x="52" y="206" width="40" height="40" rx="9" fill="#eeecff"/>
+      <rect x="61" y="215" width="22" height="16" rx="3" fill="none" stroke="#4f46e5" stroke-width="1.6"/>
+      <path d="m65 220 3 3-3 3M72 227h6" fill="none" stroke="#4f46e5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <text x="108" y="220" class="card-title mono">flow.js</text>
+    <text x="108" y="240" class="card-sub">Repeatable scripted run</text>
+
+    <!-- Capture route: live attach -->
+    <rect x="36" y="274" width="250" height="72" rx="12" fill="#fafafa" stroke="#adb3bf" stroke-dasharray="5 5"/>
+    <g aria-hidden="true">
+      <rect x="52" y="290" width="40" height="40" rx="9" fill="#eceef2"/>
+      <path d="m64 298 12 11-6.5 1.5 3.5 7-3.5 1.7-3.4-7-4.1 5Z" fill="#6b7280"/>
+      <path d="M79 299.5c2.8 2.5 4.2 5.3 4.2 8.5M77.5 303.5c1.2 1.3 1.8 2.8 1.8 4.5" fill="none" stroke="#6b7280" stroke-width="1.3" stroke-linecap="round"/>
+    </g>
+    <text x="108" y="304" class="card-title mono">live session</text>
+    <text x="108" y="324" class="card-sub">@playwright/cli · experimental</text>
+
+    <!-- Converging route lines -->
+    <g aria-hidden="true" fill="none" stroke="#9aa2b1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M286 142H316L345 226"/>
+      <path d="M286 226H345"/>
+      <path d="M286 310H316L345 226"/>
+    </g>
+    <g aria-hidden="true" fill="#4f46e5">
+      <circle cx="286" cy="142" r="3"/>
+      <circle cx="286" cy="226" r="3"/>
+      <circle cx="286" cy="310" r="3"/>
+      <circle cx="345" cy="226" r="5"/>
+    </g>
+    <path d="M350 226H370" fill="none" stroke="#4f46e5" stroke-width="2" marker-end="url(#arrow)" aria-hidden="true"/>
+
+    <!-- Shared normalization pipeline -->
+    <g filter="url(#card-shadow)">
+      <rect x="385" y="155" width="250" height="142" rx="14" fill="#1e2939"/>
+    </g>
+    <text x="409" y="183" class="dark-label">COMMON PIPELINE</text>
+    <text x="409" y="214" class="dark-title">Normalize + package</text>
+    <rect x="409" y="230" width="112" height="30" rx="7" fill="#4f46e5"/>
+    <text x="465" y="250" text-anchor="middle" class="mono" font-size="12" font-weight="700" fill="#ffffff">steps.json</text>
+    <text x="409" y="280" font-size="11.5" font-weight="500" fill="#b9c0cf">One portable step model</text>
+
+    <path d="M635 226H699" fill="none" stroke="#4f46e5" stroke-width="2" marker-end="url(#arrow)" aria-hidden="true"/>
+
+    <!-- Primary interactive output -->
+    <g filter="url(#card-shadow)">
+      <rect x="714" y="104" width="450" height="234" rx="16" fill="#ffffff" stroke="#dfe2e8"/>
+    </g>
+    <rect x="734" y="124" width="410" height="34" rx="9" fill="#1e2939"/>
+    <circle cx="752" cy="141" r="4" fill="#ffffff" opacity="0.35"/>
+    <circle cx="765" cy="141" r="4" fill="#ffffff" opacity="0.5"/>
+    <circle cx="778" cy="141" r="4" fill="#ffffff" opacity="0.7"/>
+    <rect x="802" y="133" width="318" height="16" rx="8" fill="#ffffff" opacity="0.1"/>
+    <text x="961" y="144.5" text-anchor="middle" class="mono" font-size="8.5" fill="#d7dbe3">portable://demo</text>
+
+    <rect x="734" y="158" width="410" height="160" rx="0 0 9 9" fill="#f8f8fa" stroke="#e4e6eb"/>
+    <text x="758" y="186" class="eyebrow" font-size="9.5">INTERACTIVE WALKTHROUGH</text>
+    <text x="758" y="221" class="mono" font-size="26" font-weight="720" fill="#16161d">demo.html</text>
+    <text x="758" y="244" class="card-sub">Open locally. Share as one file.</text>
+    <rect x="758" y="263" width="142" height="25" rx="12.5" fill="#eeecff"/>
+    <circle cx="773" cy="275.5" r="3.5" fill="#4f46e5"/>
+    <text x="786" y="279" font-size="9.5" font-weight="700" letter-spacing="0.55" fill="#4f46e5">CURRENT BROWSER ONLY</text>
+
+    <g aria-hidden="true">
+      <circle cx="978" cy="219" r="12" fill="none" stroke="#4f46e5" stroke-opacity="0.2" stroke-width="7"/>
+      <circle cx="978" cy="219" r="5" fill="#4f46e5"/>
+      <path d="M983 219H993" fill="none" stroke="#4f46e5" stroke-width="1.5"/>
+      <rect x="993" y="187" width="125" height="73" rx="10" fill="#4f46e5"/>
+      <text x="1009" y="211" font-size="11.5" font-weight="700" fill="#ffffff">Click. Learn.</text>
+      <text x="1009" y="228" font-size="11.5" font-weight="700" fill="#ffffff">Share.</text>
+      <text x="1009" y="247" class="mono" font-size="8.5" fill="#ffffff" opacity="0.72">1 OF 4   →</text>
+    </g>
+
+    <!-- Optional video branch -->
+    <path d="M1118 338V348" fill="none" stroke="#4f46e5" stroke-width="2" marker-end="url(#arrow)" aria-hidden="true"/>
+    <rect x="844" y="356" width="320" height="44" rx="11" fill="#ffffff" stroke="#dfe2e8"/>
+    <circle cx="868" cy="378" r="11" fill="#eeecff"/>
+    <path d="m865 372 8 6-8 6Z" fill="#4f46e5" aria-hidden="true"/>
+    <text x="889" y="375" class="card-title mono" font-size="13">demo.webm</text>
+    <text x="889" y="390" class="card-sub" font-size="10.5">Optional polished video</text>
+    <rect x="1086" y="367" width="58" height="20" rx="10" fill="#f0f1f3"/>
+    <text x="1115" y="380.5" text-anchor="middle" class="meta" font-size="8.5">OPTIONAL</text>
+  </g>
+</svg>
