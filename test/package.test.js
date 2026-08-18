@@ -118,7 +118,9 @@ test('a packed install works with dependencies hoisted into a clean consumer', (
     if (key.toLowerCase() === 'npm_config_allow_scripts') delete installEnv[key];
   }
   const install = spawnSync('npm', [
-    'install', tarball, '--ignore-scripts', '--no-audit', '--no-fund', '--offline',
+    // A fresh CI runner may not have every transitive dependency in its npm
+    // cache. Prefer the cache without making cache warmth a test prerequisite.
+    'install', tarball, '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline',
   ], { cwd: consumer, encoding: 'utf8', env: installEnv });
   assert.equal(install.status, 0, install.stderr || install.stdout);
 
