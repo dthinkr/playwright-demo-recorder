@@ -10,7 +10,7 @@
  * Both are cheap to assert and impossible to eyeball, which is exactly the
  * combination that earns a test.
  */
-const { test } = require('node:test');
+const { after, test } = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
@@ -19,7 +19,13 @@ const zlib = require('zlib');
 
 const { buildPlayer } = require('../lib/build');
 
-const tmp = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'demorec-')), 'demo.html');
+const tempDirs = [];
+after(() => tempDirs.forEach((dir) => fs.rmSync(dir, { recursive: true, force: true })));
+const tmp = () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'demorec-'));
+  tempDirs.push(dir);
+  return path.join(dir, 'demo.html');
+};
 
 /** Pull the steps back out of a built artifact, the way the player does. */
 function payloadOf(htmlPath) {
@@ -79,9 +85,7 @@ test('bulk values repeated across steps are pooled, and the pool restores them',
     'the pool must hold the original value so the player can restore it');
 });
 
-test('a trace-built artifact carries its assets, not links to them', () => {
-  // The failure this catches renders perfectly on a machine with network
-  // access, which is why it survived a visual check.
+test('already-inlined trace HTML survives player bundling without remote assets', () => {
   const steps = [{
     html: '<!DOCTYPE html><html><head><style>body{color:red}</style></head>'
       + '<body><img src="data:image/png;base64,AAAA"><p>hi</p></body></html>',
@@ -121,4 +125,17 @@ test('captured markup containing </script> cannot break out of the payload', () 
   const payloadBlock = html.match(/const STEPS_B64 = "([^"]*)"/)[1];
   assert.doesNotMatch(payloadBlock, /<\/script/i);
   assert.deepEqual(payloadOf(out).steps, steps, 'the content still round-trips intact');
+});
+
+test('generated demos retain the licenses for bundled browser runtimes', () => {
+  const out = tmp();
+  buildPlayer({ steps: [rrwebStep()], title: 'T', outFile: out });
+  const html = fs.readFileSync(out, 'utf8');
+
+  assert.match(html, /rrweb-snapshot[\s\S]*Copyright \(c\) 2018[\s\S]*MIT License/);
+  assert.match(html, /PostCSS[\s\S]*Copyright 2013 Andrey Sitnik/);
+  assert.match(html, /Nano ID[\s\S]*Copyright 2017 Andrey Sitnik/);
+  assert.match(html, /picocolors[\s\S]*ISC License/);
+  assert.match(html, /source-map-js[\s\S]*Mozilla Foundation[\s\S]*BSD 3-Clause/);
+  assert.match(html, /Floating UI[\s\S]*Copyright \(c\) 2021-present[\s\S]*MIT License/);
 });

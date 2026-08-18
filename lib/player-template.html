@@ -233,7 +233,7 @@
   <span id="url"></span>
 </footer>
 
-<div id="callout" class="hidden"><div id="arrow"></div></div>
+<div id="callout" class="hidden"></div>
 
 <script>__FLOATING_UI__</script>
 <script>__RRWEB_SNAPSHOT__</script>
@@ -247,9 +247,9 @@ let scale = 1;
 
 const $ = (id) => document.getElementById(id);
 const mount = $('mount'), overlay = $('overlay'), scaler = $('scaler'),
-      fit = $('fit'), stage = $('stage'), win = $('window'),
+      fit = $('fit'), stage = $('stage'),
       cursor = $('cursor'), ripple = $('cursorRipple'), callout = $('callout'),
-      arrowEl = $('arrow'), cover = $('cover');
+      cover = $('cover');
 
 async function loadSteps() {
   const bin = atob(STEPS_B64);

@@ -1,172 +1,287 @@
-# demo-recorder
+# Playwright Demo Recorder
 
-Turn a browser session into an **interactive product demo** — a single HTML file
-that clones the real DOM, not a slideshow of screenshots.
+**An agentic recorder for portable, interactive product demos built from
+Playwright.**
 
-Agent-driven: a script (or an agent already browsing) does the clicking, and the
-demo falls out of it. That is the part existing tools don't do — Supademo,
-Arcade, Navattic and Storylane all need a human clicking a Chrome extension, and
-every open-source Playwright demo tool outputs video.
+Turn an existing `trace.zip`, a committed browser flow, or a live agent session
+into one portable, single-file click-through HTML. The same captured steps can
+produce a polished WebM with cursor movement, callouts, and clean transitions.
 
-## What comes out
+[![CI](https://github.com/dthinkr/playwright-demo-recorder/actions/workflows/ci.yml/badge.svg)](https://github.com/dthinkr/playwright-demo-recorder/actions/workflows/ci.yml)
+![Node.js 20+](https://img.shields.io/badge/Node.js-20%2B-3c873a)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-4f46e5)](LICENSE)
 
-| Artifact | What it is |
-|---|---|
-| `demo.html` | Self-contained interactive walkthrough. Real DOM, real CSS, hover states intact. Click hotspots to advance. No server, no account, no network. |
-| `demo.webm` | Video of the finished demo — gliding cursor, callouts, dissolves — filmed from the player, not from the original browsing. |
-| `demo-steps.json` | Raw capture, so the player can be restyled without re-recording. |
+![A generated Playwright Demo Recorder output player](docs/assets/hero.png)
 
-Steps ship gzipped inside the HTML, so a multi-MB capture lands around 1 MB.
+This is the generated `demo.html` player, not a recorder GUI. Its synthetic
+walkthrough comes from the bundled sample and uses the production build path.
 
-## Two ways to capture
+![The three Playwright Demo Recorder capture routes](docs/assets/routes.svg)
 
-### 1. Flow file — reproducible
+The person opening the finished `.html` needs a current browser. They do not
+need your application, account, server, Node.js, Playwright, or a hosted demo
+workspace.
 
-Write the path once; re-run it whenever the product changes. This is the reason
-to build rather than buy: a hosted demo tool needs a human to re-record after
-every UI change, this needs one command.
+## Try the real player in 30 seconds
+
+The bundled sample builds a three-step interactive demo without launching a
+browser or downloading a fixture:
 
 ```bash
-node record.js flows/convo.js            # -> out/convo.html + .webm + trace
-node record.js flows/convo.js --headed   # watch it drive
+npm install --save-dev playwright-demo-recorder
+npx playwright-demo sample --out ./playwright-demo.html
 ```
 
-A flow exports `{ title, viewport?, run(rec, page) }`:
+Open `playwright-demo.html` and click through it. The sample uses the same player
+and build pipeline as a captured application.
+
+The `sample`, `trace`, and `rebuild` commands do not launch a browser. The
+`record` and `video` commands use Chromium. Install it once if the project does
+not have a compatible Playwright browser:
+
+```bash
+npx playwright install chromium
+```
+
+Give a coding agent this prompt when you already have a trace:
+
+> Find the latest Playwright `trace.zip` in this project. Install
+> `playwright-demo-recorder`, convert the trace into `out/product-demo.html`,
+> and report which actions became steps. Do not publish the trace or demo.
+
+> [!CAUTION]
+> A demo contains cloned DOM and application state. Password values are masked
+> and URL query strings are removed, but this tool does not anonymize visible
+> names, account data, images, or DOM attributes. Use synthetic data and review
+> every step before sharing.
+
+## The useful difference
+
+Playwright already produces rich evidence. Agents and CI runs create traces,
+tests, and browser sessions as part of normal work. Playwright Demo Recorder
+turns those artifacts into a guided product story for someone who cannot run
+the project.
+
+| Tool or artifact | Built for | Viewer receives |
+|---|---|---|
+| Playwright Trace Viewer | Debugging a test run | A detailed engineering trace |
+| Screen or demo video | Watching a fixed sequence | A flat video |
+| Hosted demo platform | Sales editing, analytics, and hosting | A hosted experience |
+| **Playwright Demo Recorder** | Agent output, CI, release proof, and product walkthroughs | A local interactive HTML, rebuildable steps, and optional video |
+
+The project stays local. It needs no recording extension, service account, or
+upload step.
+
+## Choose the input you already have
+
+| Route | Use it when | Creator requirements |
+|---|---|---|
+| **Trace** | A Playwright test or CI run already produced `trace.zip` | Node.js 20+ and `unzip`; the original app can stay offline |
+| **Flow** | The walkthrough should live in source control and follow UI changes | Node.js 20+, a reachable app, and Playwright Chromium |
+| **Attach** *(experimental)* | An agent is driving an existing browser session and you want to choose moments | The optional `@playwright/cli` package and its live session |
+
+Each route ends at the same player and step format. Start with trace when one is
+available. Use a flow for a repeatable product story. Attach remains useful for
+live agent work, with more setup and less predictable page timing.
+
+## Route 1: compile an existing trace
+
+Playwright traces contain DOM snapshots before actions, action coordinates,
+viewport data, and URLs. Convert one without checking out or running the app
+that produced it:
+
+```bash
+npx playwright-demo trace test-results/example/trace.zip \
+  --out out/onboarding \
+  --title "Product onboarding"
+```
+
+This writes `out/onboarding.html` and `out/onboarding-steps.json`. Render a
+video from the player when a flat format is useful:
+
+```bash
+npx playwright-demo video out/onboarding.html
+```
+
+The trace must include snapshots. Playwright Test trace modes do this. Custom
+tracing should call `tracing.start({ snapshots: true })`.
+
+Trace conversion calls the Unix `unzip` command. macOS and most Linux systems
+include it. Windows users can install Info-ZIP or run this route in WSL. The CLI
+reports a missing prerequisite before reading the trace.
+
+## Route 2: commit a reusable flow
+
+A flow exports `{ title, viewport?, run(rec, page) }` from a CommonJS file:
 
 ```js
+const baseUrl = process.env.DEMO_BASE_URL || 'https://example.com';
+
 module.exports = {
-  title: 'Ask a follow-up on your search',
+  title: 'Example walkthrough',
   viewport: { width: 1440, height: 900 },
   async run(rec, page) {
-    await rec.goto(APP + '/search', null);
-    await rec.type('input[placeholder*="Search"]', 'NLP complaints triage',
-                   'Start with an ordinary search.');   // captures, then types
-    await rec.press('Enter');
-    await rec.note('The AI Overview summarises the results.');  // captures, no hotspot
+    await rec.goto(baseUrl, 'Open the product page.');
+    await rec.click('a', 'Follow the highlighted link.');
+    await page.waitForLoadState('domcontentloaded');
+    await rec.note('The destination is ready.');
   },
 };
 ```
 
-`rec.click()` / `rec.type()` capture the state **before** the action with a
-hotspot on the target — the viewer clicks that hotspot and lands on the result.
-Same model Supademo uses. `rec.note()` is a "look at this" beat.
-
-### 2. Attach — record a session someone else is driving
-
-Taps a live `playwright-cli` session instead of owning the browser. Real clicks,
-existing login state, no separate run.
-
-**Auto** — one command, then just browse:
+Run the packaged [basic flow](examples/basic-flow.cjs):
 
 ```bash
-node ctl.js auto --session view --out out/mydemo --title "..."   # arm + watch
-# ... the agent browses and clicks as it normally would ...
-node ctl.js finish
+DEMO_BASE_URL=https://your-demo-app.example \
+  npx playwright-demo record ./node_modules/playwright-demo-recorder/examples/basic-flow.cjs \
+  --out out/onboarding
 ```
 
-A click listener captures each in-page interaction with its hotspot, and a
-watcher captures each page you land on. The watcher also re-arms after every
-navigation, since a page load takes the injected listener with it.
+`rec.click()` and `rec.type()` capture the state before an action and attach a
+hotspot to its target. `rec.note()` captures a result state without a hotspot.
 
-*Caveat:* for a click that navigates, the pre-click frame is lost — the page is
-torn down before any poll can drain it, so you get the page you landed on
-rather than the click that got you there. In-page clicks (dialogs, tabs,
-filters) keep their hotspot.
+`record` creates the interactive demo, its steps, a Playwright trace, and a
+polished video:
 
-**Manual** — when you want to choose the steps and write the captions:
-
-```bash
-node ctl.js start --session view --out out/mydemo --title "..."
-node ctl.js snap --say "Click Issues" --at "a[href$='/issues']"
-node ctl.js snap --say "The list loads here"
-node ctl.js finish
-```
-
-Snapshots come back over the CDP eval channel, gzipped and chunked in the page.
-A local HTTP collector was the obvious design and does not survive contact with
-reality: strict sites set a `connect-src` CSP that blocks the page from posting
-to localhost.
-
-### 3. From a trace — nothing to instrument
-
-Playwright already records everything a walkthrough needs, so a trace can be
-turned into a demo after the fact — including traces from CI that finished
-weeks ago.
-
-```bash
-node from-trace.js out/run-trace.zip --title "..."
-```
-
-| Needed | Where it already is |
+| Output | Purpose |
 |---|---|
-| DOM per step | `frame-snapshot.html` — one taken *before* every action, which is exactly the capture-then-act semantics the other modes hand-roll |
-| Hotspot | `input.point` — the real click coordinates |
-| Caption | the action's method + selector |
-| Viewport, URL | on the snapshot |
+| `<base>.html` | Portable interactive walkthrough |
+| `<base>-steps.json` | Capture data for restyling or rebuilding |
+| `<base>-trace.zip` | Original trace for debugging or reconversion |
+| `<base>.webm` | Video rendered from the finished player |
 
-No injection, no CSP workaround, no chunked transport, no re-arming after
-navigation: every one of those exists only because the other modes cannot see
-inside the browser.
+Use `--no-video` for an HTML-only run. Add `--raw-video` when you also need the
+unpolished browser recording. Raw recording consumes more time and disk space,
+so the recorder leaves it off by default.
 
-**Caveats.** The trace snapshot format is Playwright's own and undocumented —
-the decoder here follows their trace-viewer service worker, so it can break on
-a version bump. Steps come from *actions* only, so there are no "look at the
-result" beats, and captions fall back to a bare verb when the selector carries
-no human-readable text. Requires `tracing.start({ snapshots: true })`.
+## Route 3: attach to a live agent session
 
-## Also
+Attach mode uses the separate `playwright-cli` executable. The standard
+Playwright package and Playwright MCP do not provide that executable. Install
+the optional prerequisite in the project:
 
 ```bash
-node video.js out/convo.html              # video from any built demo
-node rebuild.js out/convo-steps.json --accent '#0f766e'   # restyle, no re-record
+npm install --save-dev @playwright/cli
 ```
 
-## Built on
+Start a named session. Auto mode watches clicks and page arrivals:
 
-Deliberately thin. The parts that are solved problems are not re-solved here:
+```bash
+npx playwright-cli -s=view open https://your-demo-app.example
+npx playwright-demo attach auto --session view --out out/my-demo --title "My demo"
+# Browse in the session, then run this in another terminal:
+npx playwright-demo attach finish
+```
 
-| | |
-|---|---|
-| DOM serialize / rebuild | [`rrweb-snapshot`](https://github.com/rrweb-io/rrweb) |
-| Callout anchoring, flip, collision | [`@floating-ui/dom`](https://github.com/floating-ui/floating-ui) |
-| Browser driving, video capture | [Playwright](https://playwright.dev) |
+Manual mode lets the operator choose steps and captions:
 
-What is actually ours: the step model (discrete snapshots + hotspots), the
-attach transport, and the pipeline.
+```bash
+npx playwright-demo attach start --session view --out out/my-demo --title "My demo"
+npx playwright-demo attach snap --say "Click Issues" --at "a[href$='/issues']"
+npx playwright-demo attach snap --say "The list loads here"
+npx playwright-demo attach finish
+```
 
-## How it works
+Attach state files (`.session.json` and `.stop`) live in the caller's project.
+Run commands for one recording from the same directory.
 
-`rrweb-snapshot` serializes the live DOM — inlining stylesheets, images, fonts
-and input values — and rebuilds it into a sandboxed iframe at playback. Scripts
-are neutered at capture time and the iframe gets no `allow-scripts`, so the
-clone is inert: CSS, hover states, fonts and layout survive; nothing executes.
+A click that causes immediate navigation can destroy the page context before
+auto mode captures the pre-click frame. The arriving page still becomes a
+step. In-page clicks such as dialogs, tabs, and filters retain their hotspot.
 
-That inertness is why demos are stepwise rather than a live sandbox — each
-JS-driven state is captured as its own step and stitched with hotspots.
-Supademo works the same way. Cloning the running app instead is a different
-(much larger) class of product.
+## Rebuild and library API
+
+Restyle captured steps without another browser run:
+
+```bash
+npx playwright-demo rebuild out/onboarding-steps.json \
+  --out out/onboarding-green.html \
+  --accent '#0f766e'
+```
+
+CommonJS callers can reuse the pipeline pieces:
+
+```js
+const {
+  DemoRecorder,
+  buildPlayer,
+  stepsFromTrace,
+} = require('playwright-demo-recorder');
+```
+
+## Privacy boundary
+
+An interactive demo stores a page's DOM rather than a pixel-only recording.
+Treat each trace, steps file, raw video, and generated HTML as sensitive until
+someone reviews it.
+
+The recorder applies three narrow safeguards:
+
+- generated action captions omit typed values;
+- password input values become a fixed mask;
+- stored step URLs lose query strings and fragments.
+
+Visible page text, names, email addresses, account data, images, DOM attributes,
+and application state can remain. Use a demo account with synthetic data, open
+the final HTML offline, and inspect each step before sending it. The original
+trace remains sensitive even when the generated demo looks safe.
+
+See [SECURITY.md](SECURITY.md) before reporting a vulnerability or sharing a
+reproduction.
+
+## How the artifact works
+
+Flow and attach captures use `rrweb-snapshot` to serialize the live DOM. The
+player restores styles, images, fonts, form state, and hoverable structure in a
+sandboxed iframe without running captured scripts. Trace conversion follows
+Playwright's trace-viewer snapshot model and inlines resources found in the
+trace.
+
+The builder pools repeated assets and gzips the payload inside the HTML. The
+player uses Floating UI to keep callouts visible near viewport edges. Playback
+requires `DecompressionStream`, available in Chrome 80+, Safari 16.4+, and
+Firefox 113+.
+
+Generated demos retain the required third-party license comments. Full texts
+are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Known limits
 
-- **JS does not run in the clone.** CSS-driven motion survives; a dropdown that
-  needs JS does not open. Capture each state as a step.
-- **Size scales with page complexity.** ~1 MB/step for a typical app page, 4–5 MB
-  for something like a GitHub repo view (before compression).
-- **Canvas/WebGL** is unreliable, **cross-origin iframes** cannot be serialized.
-- Sites with bot protection may refuse Playwright entirely.
+- Captured application JavaScript does not run in the clone. Add a step for each
+  state the viewer should see.
+- Trace conversion creates beats from supported Playwright actions and their
+  pre-action snapshots. It does not infer assertions, pauses, or the result
+  after the final action as extra beats.
+- Stylesheets and image elements found in a trace are inlined. URLs nested in
+  CSS, including some webfonts and background images, may still request the
+  network. Check important demos while offline.
+- Canvas, WebGL, and cross-origin iframes do not clone with full fidelity.
+- Size grows with page complexity. Content-heavy pages can add several MB per
+  uncompressed step before pooling and gzip.
+- Sites with bot protection may reject an automated Playwright browser.
+- Playwright's trace snapshot format is internal. The decoder warns outside its
+  verified version range, and new Playwright output still needs visual review.
 
-## Setup
+## Work from a source checkout
+
+Installed commands use `npx playwright-demo`. In this repository, use
+`node cli.js`:
 
 ```bash
 npm install
 npx playwright install chromium
-npm test                    # no browser needed
+npm test
+node cli.js sample --out out/sample.html
+node cli.js record examples/basic-flow.cjs --no-video
 ```
 
-Tests cover the parts that fail silently: node-reference addressing in the
-trace decoder (a wrong reference yields valid HTML of the wrong page), the
-gzip round trip, asset pooling, and self-containment — a demo that quietly
-depends on the network looks perfect on the machine that built it.
+Recorded output, session state, traces, and videos are ignored by git and
+excluded from the npm package.
 
-Playback needs a current browser (Chrome 80+, Safari 16.4+, Firefox 113+) for
-`DecompressionStream`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for pull request expectations and
+[CHANGELOG.md](CHANGELOG.md) for release notes.
+
+## License
+
+Apache-2.0. Bundled browser runtimes retain their MIT notices in generated
+artifacts.
